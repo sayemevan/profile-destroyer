@@ -1,10 +1,10 @@
 import { loadProfile, profileFromFile, imageFromFile } from './profile.js';
 import { Game, replayDamage } from './game.js';
-import { makeShareImage, shareLink, shareText, socialUrls } from './share.js';
+import { makeShareImage, shareLink } from './share.js';
 import { sfx } from './audio.js';
 import { WEAPONS, WEAPON_ORDER } from './weapons.js';
 import { drawGun } from './gunman.js';
-import { PRESETS, presetProfile, targetLabel } from './targets.js';
+import { PRESETS, presetProfile } from './targets.js';
 import { Clip } from './clip.js';
 
 const $ = id => document.getElementById(id);
@@ -186,7 +186,7 @@ async function showResult(res) {
   await renderShare();
 }
 
-// Builds the share image and links for the current result (again after a fix-up).
+// Builds the share image and link for the current result (again after a fix-up).
 async function renderShare() {
   const res = result;
   const canvas = await makeShareImage(res);
@@ -195,17 +195,8 @@ async function renderShare() {
   imageUrl = imageBlob ? URL.createObjectURL(imageBlob) : canvas.toDataURL('image/jpeg', 0.9);
   $('resultImg').src = imageUrl;
 
-  // Start with the plain challenge link; swap in the short /s/<id> link (which
-  // has the image as its preview) once the upload finishes.
   shareUrl = shareLink(profile, res.pct);
-  setSocialLinks();
-  setPreparing(true);
   show('result');
-  const url = await uploadShare(canvas, res);
-  if (result !== res) return;
-  if (url) shareUrl = url;
-  setSocialLinks();
-  setPreparing(false);
 }
 
 // Re-draws the same wreckage on the real photo/name the player just added.
@@ -236,43 +227,6 @@ $('fixFile').addEventListener('change', async e => {
   }
 });
 $('fixSave').addEventListener('click', () => applyFix(null));
-
-async function uploadShare(canvas, res) {
-  try {
-    const r = await fetch('/api/share', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image: canvas.toDataURL('image/jpeg', 0.85),
-        pct: res.pct,
-        handle: profile.handle,
-        service: profile.service.name,
-        target: profile.url,
-        weapon: res.weapon.name,
-        label: targetLabel(profile),
-        name: profile.private ? profile.name : '',
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) console.warn('Share upload failed, using the plain link (no preview image):', data.error || r.status);
-    return r.ok ? data.url : null;
-  } catch (err) {
-    console.warn('Share upload failed, using the plain link (no preview image):', err.message);
-    return null;
-  }
-}
-
-function setSocialLinks() {
-  const urls = socialUrls(shareText(profile, result.pct, result.weapon), shareUrl);
-  $('fbBtn').href = urls.facebook;
-  $('waBtn').href = urls.whatsapp;
-  $('xBtn').href = urls.x;
-}
-
-function setPreparing(on) {
-  for (const id of ['fbBtn', 'waBtn', 'xBtn', 'copyBtn']) $(id).classList.toggle('busy', on);
-}
 
 function download(href, name) {
   const a = document.createElement('a');

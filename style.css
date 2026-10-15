@@ -79,7 +79,6 @@ body {
 .btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #000; }
 .btn.primary { background: var(--yellow); }
 .btn.ghost { background: transparent; color: var(--ink); border-color: var(--ink); box-shadow: 4px 4px 0 var(--line); }
-.btn.social { background: var(--card); color: var(--ink); border-color: var(--ink); box-shadow: 4px 4px 0 var(--line); flex: 1; font-size: 14px; padding: 12px 8px; }
 .btn.wide { width: 100%; }
 .btn.video { background: #ff3b7a; color: #fff; }
 .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 440px; }
@@ -91,7 +90,6 @@ body {
 .preset:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #000; }
 .preset .emoji { font-size: 30px; line-height: 1.1; }
 .row.quick { width: 100%; max-width: 440px; }
-.btn.busy { opacity: .45; pointer-events: none; }
 .follow {
   width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 8px; align-items: center;
   padding: 12px; border-radius: 14px; background: rgba(0,0,0,.25); border: 2px dashed var(--line);

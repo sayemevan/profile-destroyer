@@ -176,22 +176,6 @@ export function shareLink(profile, pct) {
   return `${base}?t=${encodeURIComponent(profile.url)}&s=${pct}${name}`;
 }
 
-export function shareText(profile, pct, weapon) {
-  const who = targetLabel(profile);
-  const gun = weapon ? ` with a ${weapon.name.toLowerCase()}` : '';
-  return `💥🔫 I destroyed ${pct}% of ${who}${gun} on Profile Destroyer. Can you beat that?`;
-}
-
-export function socialUrls(text, link) {
-  const u = encodeURIComponent(link);
-  return {
-    x: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${u}`,
-    // Opens Facebook directly; the before/after image shows as the link preview (og:image).
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}&hashtag=${encodeURIComponent(BRAND.hashtag)}`,
-    whatsapp: `https://wa.me/?text=${encodeURIComponent(`${text} ${link}`)}`,
-  };
-}
-
 function fit(g, text, maxW, size, min, weight) {
   do { g.font = `${weight} ${size}px ${SANS}`; size--; } while (g.measureText(text).width > maxW && size >= min);
 }

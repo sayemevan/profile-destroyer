@@ -1,8 +1,5 @@
 // Shared helpers for the API functions. Files starting with "_" are not routes on Vercel.
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-
 export const BOT_UA = 'Mozilla/5.0 (compatible; ProfileDestroyerBot/1.0; +https://github.com/sayemevan/profile-destroyer)';
 
 // Only these sites are ever fetched server-side (no open proxy / SSRF).
@@ -24,29 +21,11 @@ export function query(req) {
   return new URL(req.url, 'http://localhost').searchParams;
 }
 
-export function origin(req) {
-  const host = req.headers['x-forwarded-host'] || req.headers.host;
-  const proto = req.headers['x-forwarded-proto'] || (host?.startsWith('localhost') ? 'http' : 'https');
-  return `${proto}://${host}`;
-}
-
 export function sendJson(res, status, data, cache = 'no-store') {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', cache);
   res.end(JSON.stringify(data));
-}
-
-export async function readBody(req, limit) {
-  if (req.body !== undefined) return typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-  const chunks = [];
-  let size = 0;
-  for await (const chunk of req) {
-    size += chunk.length;
-    if (size > limit) throw new Error('too large');
-    chunks.push(chunk);
-  }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
 // Fetch a profile page, following redirects only while they stay on allowed hosts.
@@ -89,39 +68,3 @@ function decodeEntities(s) {
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 }
 
-export function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-// ---------------------------------------------------------------- storage
-// Vercel Blob in production (needs BLOB_READ_WRITE_TOKEN); a local .data/ folder in dev.
-
-const LOCAL_DIR = path.join(process.cwd(), '.data');
-const useBlob = () => !!process.env.BLOB_READ_WRITE_TOKEN;
-
-export async function putFile(name, body, contentType) {
-  if (useBlob()) {
-    const { put } = await import('@vercel/blob');
-    const r = await put(name, body, { access: 'public', contentType, addRandomSuffix: false });
-    return r.url;
-  }
-  if (process.env.VERCEL) throw new Error('Blob storage is not connected (BLOB_READ_WRITE_TOKEN missing)');
-  const file = path.join(LOCAL_DIR, name);
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, body);
-  return `/.data/${name}`;
-}
-
-export async function getJson(name) {
-  try {
-    if (useBlob()) {
-      const { head } = await import('@vercel/blob');
-      const h = await head(name);
-      const r = await fetch(h.url);
-      return r.ok ? await r.json() : null;
-    }
-    return JSON.parse(await readFile(path.join(LOCAL_DIR, name), 'utf8'));
-  } catch {
-    return null;
-  }
-}

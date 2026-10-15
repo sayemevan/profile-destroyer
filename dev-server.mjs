@@ -1,5 +1,5 @@
 // Local dev server: serves the static site and runs the /api functions the same
-// way Vercel does. Share images are stored in ./.data instead of Vercel Blob.
+// way Vercel does.
 //   npm run dev  →  http://localhost:8765
 
 import http from 'node:http';
@@ -17,10 +17,6 @@ const TYPES = {
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   try {
-    // same rewrite as vercel.json
-    const share = /^\/s\/([\w-]+)$/.exec(url.pathname);
-    if (share) req.url = `/api/s?id=${share[1]}`;
-
     const api = /^\/api\/([a-z]+)$/.exec(new URL(req.url, 'http://x').pathname);
     if (api) {
       const mod = await import(`./api/${api[1]}.js?t=${Date.now()}`);
