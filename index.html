@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#251a42">
+  <title>Profile Destroyer</title>
+  <meta name="description" content="Paste a social profile link and blast it to pieces with a tiny cartoon gunslinger. Share how much you destroyed.">
+  <meta property="og:title" content="Profile Destroyer">
+  <meta property="og:description" content="Paste a profile link. Blast it to bits. Brag about it.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="home" class="screen active">
+    <div class="logo">PROFILE<span>DESTROYER</span></div>
+    <p class="tag">Paste any social profile link. Blast it to bits. Brag about it.</p>
+    <div id="challenge" class="challenge" hidden></div>
+    <form id="urlForm" class="url-form">
+      <input id="urlInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+             placeholder="https://x.com/username" aria-label="Profile link">
+      <button type="submit" class="btn primary">Load target</button>
+    </form>
+    <div class="or">or</div>
+    <label class="btn ghost">Upload a photo<input id="fileInput" type="file" accept="image/*" hidden></label>
+    <p id="homeError" class="error" hidden></p>
+    <p class="examples">Works with X, Instagram, GitHub, YouTube, TikTok, Reddit, Twitch, Bluesky, Threads…</p>
+    <p class="fine">Just for laughs. Nothing happens to the real account.</p>
+  </main>
+
+  <section id="game" class="screen">
+    <canvas id="stage"></canvas>
+    <div class="hud">
+      <button id="quitBtn" class="icon-btn" aria-label="Back">✕</button>
+      <div class="meter">
+        <div class="meter-top"><span>DESTROYED</span><b id="pct">0%</b></div>
+        <div class="bar"><div id="bar"></div></div>
+      </div>
+      <div id="timer" class="timer">15</div>
+      <button id="muteBtn" class="icon-btn" aria-label="Mute">🔊</button>
+    </div>
+    <div id="weapons" class="weapons" role="radiogroup" aria-label="Choose your gun"></div>
+    <div id="combo" class="combo"></div>
+    <div id="countdown" class="countdown"></div>
+    <div id="hint" class="hint">Pick a gun · Tap to shoot · Hold &amp; slide to spray</div>
+  </section>
+
+  <section id="result" class="screen">
+    <p id="resultMsg" class="result-msg"></p>
+    <img id="resultImg" class="result-img" alt="The destroyed profile">
+    <div class="result-actions">
+      <button id="shareBtn" class="btn primary wide">Share 💥</button>
+      <div class="row">
+        <a id="fbBtn" class="btn social" target="_blank" rel="noopener">Facebook</a>
+        <a id="waBtn" class="btn social" target="_blank" rel="noopener">WhatsApp</a>
+        <a id="xBtn" class="btn social" target="_blank" rel="noopener">X</a>
+      </div>
+      <div class="row">
+        <button id="dlBtn" class="btn ghost">Save image</button>
+        <button id="copyBtn" class="btn ghost">Copy link</button>
+      </div>
+      <div class="row">
+        <button id="againBtn" class="btn">Play again</button>
+        <button id="newBtn" class="btn ghost">New target</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="loading" class="loading" hidden><div class="spinner"></div>Loading target…</div>
+  <div id="toast" class="toast"></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
