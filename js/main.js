@@ -1,6 +1,6 @@
 import { loadProfile, profileFromFile, imageFromFile } from './profile.js';
 import { Game, replayDamage } from './game.js';
-import { makeShareImage, shareLink, shareText, socialUrls, caption } from './share.js';
+import { makeShareImage, shareLink, shareText, socialUrls } from './share.js';
 import { sfx } from './audio.js';
 import { WEAPONS, WEAPON_ORDER } from './weapons.js';
 import { drawGun } from './gunman.js';
@@ -254,8 +254,11 @@ async function uploadShare(canvas, res) {
       }),
       signal: AbortSignal.timeout(15000),
     });
-    return r.ok ? (await r.json()).url : null;
-  } catch {
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) console.warn('Share upload failed, using the plain link (no preview image):', data.error || r.status);
+    return r.ok ? data.url : null;
+  } catch (err) {
+    console.warn('Share upload failed, using the plain link (no preview image):', err.message);
     return null;
   }
 }
@@ -290,21 +293,13 @@ function videoFile() {
   return new File([video], `destroyed-${profile.handle}.${ext}`, { type: video.type });
 }
 
-// Post text with the game link and Sayem Dreams' page/channel, ready to paste.
-function copyCaption() {
-  const text = caption(shareText(profile, result.pct, result.weapon), shareUrl);
-  return navigator.clipboard?.writeText(text).then(() => true, () => false) ?? Promise.resolve(false);
-}
-
 // Shares a file (image or video) on its own. Text/links are left out on purpose:
 // several apps (Facebook, WhatsApp) drop the file when a link comes along with it.
-// The caption (with clickable links) goes to the clipboard instead, for pasting.
+// The image itself carries the Sayem Dreams page/channel.
 async function shareFile(file) {
-  const copied = copyCaption(); // started before share() so the tap still counts for it
   if (file && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
-      if (await copied) toast('Caption with links copied. Paste it in your post!');
     } catch (err) {
       if (err.name !== 'AbortError') toast('Sharing failed. Try saving it instead.');
     }
@@ -316,7 +311,7 @@ async function shareFile(file) {
 $('shareBtn').addEventListener('click', async () => {
   if (await shareFile(imageFile())) return;
   saveImage();
-  toast((await copyCaption()) ? 'Image saved & caption copied. Post it anywhere!' : 'Image saved. Post it anywhere!');
+  toast('Image saved. Post it anywhere!');
 });
 
 $('videoBtn').addEventListener('click', async () => {
@@ -325,15 +320,7 @@ $('videoBtn').addEventListener('click', async () => {
   const url = URL.createObjectURL(file);
   download(url, file.name);
   setTimeout(() => URL.revokeObjectURL(url), 10000);
-  toast((await copyCaption()) ? 'Video saved & caption copied!' : 'Video saved!');
-});
-
-// Opens Facebook straight away (like WhatsApp) with the share link; the
-// before/after picture shows as the link preview. Facebook doesn't allow
-// prefilled post text, so the caption with the page/channel links is copied
-// for pasting. (Posting the photo itself needs the share sheet: "Share image".)
-$('fbBtn').addEventListener('click', () => {
-  copyCaption().then(ok => ok && toast('Caption copied. Paste it in your Facebook post!'));
+  toast('Video saved!');
 });
 
 $('dlBtn').addEventListener('click', saveImage);

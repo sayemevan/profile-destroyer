@@ -182,20 +182,13 @@ export function shareText(profile, pct, weapon) {
   return `💥🔫 I destroyed ${pct}% of ${who}${gun} on Profile Destroyer. Can you beat that?`;
 }
 
-// Full post text with clickable links: the game, plus Sayem Dreams' page and channel.
-export function caption(text, link) {
-  return `${text}\n👉 Play: ${link}\n\nMade by ${BRAND.name} 💛\nFollow: ${BRAND.facebook}\nSubscribe: ${BRAND.youtube.replace('?sub_confirmation=1', '')}\n${BRAND.hashtag}`;
-}
-
 export function socialUrls(text, link) {
   const u = encodeURIComponent(link);
-  // X counts every link as 23 characters, so this stays well under 280.
-  const tweet = `${text}\n\nMade by ${BRAND.name} ▶ ${BRAND.youtube.replace('?sub_confirmation=1', '')} ${BRAND.hashtag}`;
   return {
-    x: `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${u}`,
-    // Facebook ignores prefilled text; the link preview (og:image) and hashtag are what show up.
+    x: `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${u}`,
+    // Opens Facebook directly; the before/after image shows as the link preview (og:image).
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}&hashtag=${encodeURIComponent(BRAND.hashtag)}`,
-    whatsapp: `https://wa.me/?text=${encodeURIComponent(caption(text, link))}`,
+    whatsapp: `https://wa.me/?text=${encodeURIComponent(`${text} ${link}`)}`,
   };
 }
 
