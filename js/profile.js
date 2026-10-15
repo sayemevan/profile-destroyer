@@ -1,5 +1,7 @@
 // Turns a pasted profile link into { service, handle, name, bio, stats, avatar }.
-// Avatars come from unavatar.io (CORS-enabled, so the canvas stays exportable).
+// The server (/api/profile) reads the page's public name + picture and resolves
+// Facebook share links; pictures go through /api/img so the canvas stays exportable.
+// Without the API (plain static hosting) it falls back to unavatar.io directly.
 
 const SERVICES = [
   { id: 'x', name: 'X', color: '#111111', hosts: ['x.com', 'twitter.com'], avatar: 'x' },
@@ -11,7 +13,7 @@ const SERVICES = [
   { id: 'twitch', name: 'Twitch', color: '#9146ff', hosts: ['twitch.tv'], avatar: 'twitch' },
   { id: 'bluesky', name: 'Bluesky', color: '#1185fe', hosts: ['bsky.app'], avatar: 'bluesky' },
   { id: 'threads', name: 'Threads', color: '#111111', hosts: ['threads.net', 'threads.com'], avatar: 'instagram' },
-  { id: 'facebook', name: 'Facebook', color: '#1877f2', hosts: ['facebook.com', 'fb.com'], avatar: null },
+  { id: 'facebook', name: 'Facebook', color: '#1877f2', hosts: ['facebook.com', 'fb.com', 'web.facebook.com'], avatar: 'facebook' },
   { id: 'linkedin', name: 'LinkedIn', color: '#0a66c2', hosts: ['linkedin.com'], avatar: null },
 ];
 
@@ -63,7 +65,9 @@ export function parseTarget(input) {
       handle = first === 'profile' ? segs[1] : null;
       break;
     case 'facebook':
-      handle = first === 'profile.php' ? url.searchParams.get('id') : segs[0];
+      // facebook.com/share/<code> (from the app's "Copy link") has to be resolved by the server.
+      if (first === 'share') return { svc, handle: null, url: url.href, resolve: true };
+      handle = first === 'profile.php' ? url.searchParams.get('id') : first === 'people' ? segs[2] : segs[0];
       break;
     case 'web':
       handle = segs[0] || host;
@@ -82,16 +86,32 @@ export function parseTarget(input) {
 }
 
 export async function loadProfile(input) {
-  const { svc, handle, url } = parseTarget(input);
+  const target = parseTarget(input);
+  const { svc } = target;
+  let { handle, url } = target;
+  const sources = [];
+
+  if (svc.id !== 'github' && svc.id !== 'web') {
+    const info = await lookup(url);
+    if (target.resolve) {
+      const real = info?.url && safeParse(info.url);
+      if (!real?.handle) {
+        throw new Error("Couldn't open that Facebook share link. Open the profile and copy the link from your browser's address bar instead.");
+      }
+      ({ handle, url } = real);
+    }
+    if (info?.image) sources.push(info.image);
+    if (info?.name) target.name = info.name;
+  }
+
   const profile = {
     service: svc, handle, url,
-    name: handle,
+    name: target.name || handle,
     bio: GAG_BIOS[Math.floor(Math.random() * GAG_BIOS.length)],
     stats: GAG_STATS,
     avatar: null,
   };
 
-  const sources = [];
   if (svc.id === 'github') {
     try {
       const r = await fetch(`https://api.github.com/users/${encodeURIComponent(handle)}`);
@@ -113,10 +133,35 @@ export async function loadProfile(input) {
   if (svc.site) sources.push(`https://unavatar.io/${encodeURIComponent(svc.site)}?fallback=false`);
 
   for (const src of sources) {
-    try { profile.avatar = await loadImage(src, 9000); break; } catch { /* try next */ }
+    try { profile.avatar = await loadImage(proxied(src), 9000); break; } catch { /* try next */ }
   }
   if (!profile.avatar) profile.avatar = initialsAvatar(handle, svc.color);
   return profile;
+}
+
+// null = not checked yet; false = no API here (plain static hosting / local static server)
+let apiAvailable = null;
+
+async function lookup(url) {
+  if (apiAvailable === false) return null;
+  try {
+    const r = await fetch(`/api/profile?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(10000) });
+    const json = (r.headers.get('content-type') || '').includes('application/json');
+    apiAvailable = json;
+    return json && r.ok ? await r.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+// GitHub avatars send CORS headers themselves; everything else goes through our proxy.
+function proxied(src) {
+  if (!apiAvailable || src.startsWith('https://avatars.githubusercontent.com/')) return src;
+  return `/api/img?src=${encodeURIComponent(src)}`;
+}
+
+function safeParse(url) {
+  try { return parseTarget(url); } catch { return null; }
 }
 
 export async function profileFromFile(file) {

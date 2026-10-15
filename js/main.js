@@ -12,6 +12,7 @@ let profile = null;
 let result = null;
 let imageBlob = null;
 let imageUrl = null;
+let shareUrl = null;
 
 const params = new URLSearchParams(location.search);
 const challenge = {
@@ -119,9 +120,9 @@ async function showResult(res) {
   result = res;
   const { pct } = res;
   const canvas = await makeShareImage(res);
-  imageBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+  imageBlob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
   if (imageUrl) URL.revokeObjectURL(imageUrl);
-  imageUrl = imageBlob ? URL.createObjectURL(imageBlob) : canvas.toDataURL('image/png');
+  imageUrl = imageBlob ? URL.createObjectURL(imageBlob) : canvas.toDataURL('image/jpeg', 0.9);
   $('resultImg').src = imageUrl;
 
   let msg = `${res.weapon.name} · ${res.hits} hits · best combo ${res.bestCombo}`;
@@ -132,42 +133,79 @@ async function showResult(res) {
   }
   $('resultMsg').textContent = msg;
 
-  const link = shareLink(profile, pct);
-  const urls = socialUrls(shareText(profile, pct, res.weapon), link);
-  $('xBtn').href = urls.x;
-  $('fbBtn').href = urls.facebook;
-  $('waBtn').href = urls.whatsapp;
+  // Start with the plain challenge link; swap in the short /s/<id> link (which
+  // has the image as its preview) once the upload finishes.
+  shareUrl = shareLink(profile, pct);
+  setSocialLinks();
+  setPreparing(true);
   show('result');
+  const url = await uploadShare(canvas, res);
+  if (result !== res) return;
+  if (url) shareUrl = url;
+  setSocialLinks();
+  setPreparing(false);
 }
 
-$('shareBtn').addEventListener('click', async () => {
-  const text = shareText(profile, result.pct, result.weapon);
-  const url = shareLink(profile, result.pct);
-  const file = imageBlob && new File([imageBlob], 'profile-destroyed.png', { type: 'image/png' });
+async function uploadShare(canvas, res) {
   try {
-    if (file && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], text: `${text} ${url}` });
-    } else if (navigator.share) {
-      await navigator.share({ text, url });
-    } else {
-      await navigator.clipboard.writeText(`${text} ${url}`);
-      toast('Copied! Paste it anywhere.');
-    }
-  } catch (err) {
-    if (err.name !== 'AbortError') toast('Sharing failed. Try Save image instead.');
+    const r = await fetch('/api/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: canvas.toDataURL('image/jpeg', 0.85),
+        pct: res.pct,
+        handle: profile.handle,
+        service: profile.service.name,
+        target: profile.url,
+        weapon: res.weapon.name,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    return r.ok ? (await r.json()).url : null;
+  } catch {
+    return null;
   }
-});
+}
 
-$('dlBtn').addEventListener('click', () => {
+function setSocialLinks() {
+  const urls = socialUrls(shareText(profile, result.pct, result.weapon), shareUrl);
+  $('fbBtn').href = urls.facebook;
+  $('waBtn').href = urls.whatsapp;
+  $('xBtn').href = urls.x;
+}
+
+function setPreparing(on) {
+  for (const id of ['fbBtn', 'waBtn', 'xBtn', 'copyBtn']) $(id).classList.toggle('busy', on);
+}
+
+function saveImage() {
   const a = document.createElement('a');
   a.href = imageUrl;
-  a.download = `destroyed-${profile.handle}-${result.pct}.png`;
+  a.download = `destroyed-${profile.handle}-${result.pct}.jpg`;
   a.click();
+}
+
+// Shares the picture itself. Text/links are left out on purpose: several apps
+// (Facebook, WhatsApp) drop the image when a link comes along with it.
+$('shareBtn').addEventListener('click', async () => {
+  const file = imageBlob && new File([imageBlob], `destroyed-${profile.handle}.jpg`, { type: 'image/jpeg' });
+  if (file && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+    } catch (err) {
+      if (err.name !== 'AbortError') toast('Sharing failed. Try Save image instead.');
+    }
+    return;
+  }
+  saveImage();
+  toast('Image saved. Post it anywhere!');
 });
+
+$('dlBtn').addEventListener('click', saveImage);
 
 $('copyBtn').addEventListener('click', async () => {
   try {
-    await navigator.clipboard.writeText(shareLink(profile, result.pct));
+    await navigator.clipboard.writeText(shareUrl);
     toast('Link copied!');
   } catch {
     toast('Could not copy the link.');

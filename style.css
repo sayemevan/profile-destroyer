@@ -72,6 +72,7 @@ body {
 .btn.ghost { background: transparent; color: var(--ink); border-color: var(--ink); box-shadow: 4px 4px 0 var(--line); }
 .btn.social { background: var(--card); color: var(--ink); border-color: var(--ink); box-shadow: 4px 4px 0 var(--line); flex: 1; font-size: 14px; padding: 12px 8px; }
 .btn.wide { width: 100%; }
+.btn.busy { opacity: .45; pointer-events: none; }
 
 /* ---------- game ---------- */
 #game { padding: 0; }

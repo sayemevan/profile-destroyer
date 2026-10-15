@@ -1,0 +1,63 @@
+// GET /s/<id>  (rewritten to /api/s?id=<id>)
+// The page people land on from a shared link. Crawlers read the og:image (the
+// before/after picture); people are sent on to the game with the challenge loaded.
+
+import { escapeHtml, getJson, origin, query } from './_lib.js';
+
+export default async function handler(req, res) {
+  const id = query(req).get('id') || '';
+  const meta = /^[\w-]{8}$/.test(id) ? await getJson(`shares/${id}.json`) : null;
+  const base = origin(req);
+  if (!meta) {
+    res.statusCode = 302;
+    res.setHeader('Location', '/');
+    return res.end();
+  }
+
+  const image = meta.image.startsWith('http') ? meta.image : base + meta.image;
+  const who = meta.target ? `@${meta.handle}'s ${meta.service} profile` : 'this profile';
+  const title = `${meta.pct}% DESTROYED 💥 ${who}`;
+  const desc = `Blasted with a ${meta.weapon || 'gun'} on Profile Destroyer. Think you can do more damage?`;
+  const game = meta.target ? `/?t=${encodeURIComponent(meta.target)}&s=${meta.pct}` : '/';
+  const e = escapeHtml;
+
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=86400');
+  res.end(`<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${e(title)}</title>
+<meta name="description" content="${e(desc)}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Profile Destroyer">
+<meta property="og:title" content="${e(title)}">
+<meta property="og:description" content="${e(desc)}">
+<meta property="og:url" content="${e(`${base}/s/${id}`)}">
+<meta property="og:image" content="${e(image)}">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1080">
+<meta property="og:image:height" content="1080">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${e(title)}">
+<meta name="twitter:description" content="${e(desc)}">
+<meta name="twitter:image" content="${e(image)}">
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #251a42; color: #fff;
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 16px; }
+  img { width: 100%; max-width: 440px; border-radius: 16px; border: 3px solid #000; }
+  a { display: inline-block; margin-top: 16px; padding: 14px 22px; background: #ffd23f; color: #111; font-weight: 800;
+      border: 3px solid #000; border-radius: 14px; text-decoration: none; }
+</style>
+</head>
+<body>
+<main>
+  <img src="${e(image)}" alt="${e(title)}">
+  <div><a href="${e(game)}">Your turn: destroy it 💥</a></div>
+</main>
+<script>setTimeout(function () { location.replace(${JSON.stringify(game)}); }, 1200);</script>
+</body>
+</html>`);
+}
