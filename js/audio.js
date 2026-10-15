@@ -1,6 +1,8 @@
 // Synthesized sound effects (no audio files needed).
 
 let ac = null;
+let out = null;        // master bus: speakers + (optionally) the video recorder
+let recDest = null;
 let muted = false;
 let noiseBuf = null;
 
@@ -9,6 +11,8 @@ function A() {
     const C = window.AudioContext || window.webkitAudioContext;
     if (!C) return null;
     ac = new C();
+    out = ac.createGain();
+    out.connect(ac.destination);
   }
   if (ac.state === 'suspended') ac.resume();
   return ac;
@@ -31,7 +35,7 @@ function noise(dur, type, freq, vol) {
   const g = a.createGain();
   g.gain.setValueAtTime(vol, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  src.connect(f).connect(g).connect(a.destination);
+  src.connect(f).connect(g).connect(out);
   src.start(t, Math.random() * 0.4);
   src.stop(t + dur);
 }
@@ -47,9 +51,20 @@ function tone(f0, f1, dur, vol, type = 'sine') {
   const g = a.createGain();
   g.gain.setValueAtTime(vol, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  o.connect(g).connect(a.destination);
+  o.connect(g).connect(out);
   o.start(t);
   o.stop(t + dur);
+}
+
+// Audio track for recording the round as a video.
+export function audioStream() {
+  const a = A();
+  if (!a || !a.createMediaStreamDestination) return null;
+  if (!recDest) {
+    recDest = a.createMediaStreamDestination();
+    out.connect(recDest);
+  }
+  return recDest.stream;
 }
 
 export const sfx = {

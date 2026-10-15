@@ -31,6 +31,7 @@ export default async function handler(req, res) {
     const u = new URL(body.target);
     if (u.protocol === 'https:' && isProfileHost(u.hostname)) target = u.href;
   } catch { /* uploaded photo: no target */ }
+  if (/^preset:[a-z]+$/.test(body.target || '')) target = body.target;
 
   const id = randomBytes(6).toString('base64url');
   try {
@@ -40,6 +41,8 @@ export default async function handler(req, res) {
       handle: text(body.handle, 60),
       service: text(body.service, 30),
       weapon: text(body.weapon, 20),
+      label: text(body.label, 80),
+      name: text(body.name, 40),
       created: new Date().toISOString(),
     };
     await putFile(`shares/${id}.json`, JSON.stringify(meta), 'application/json');

@@ -18,6 +18,9 @@ Then open http://localhost:8765. The dev server runs the `/api` functions like V
 - `js/game.js`: the 15-second round. Tap to shoot, or hold and slide to spray. The gunman follows your finger. Bullets punch holes, crack and scorch the card, and knock off chunks. Every 10-hit combo fires a MEGA SHOT. The destroyed % is tracked on a 10px cell grid, and shots through existing holes miss. Shots on the profile photo leave a faded copy of the face behind.
 - `js/weapons.js`: pistol, uzi, shotgun and bazooka, tuned to destroy about the same amount per round. The choice is remembered per browser.
 - `js/share.js`: builds a 1080×1080 before/after brag image and the Facebook, WhatsApp and X share links. The link carries `?t=<profile url>&s=<score>`, so friends land on a "beat this score" challenge.
+- `js/targets.js`: one-tap cartoon targets (My Boss, My Ex, Monday, Exams, Alarm Clock, Slow WiFi) and the Mystery card for private profiles. Private profiles play straight away; after the round the player can add the real name and photo, and `replayDamage` redraws the exact same damage on it.
+- `js/clip.js`: records the round as a 540×960 video with sound, a score bar and a Sayem Dreams watermark, to share on Reels, TikTok and Stories.
+- Challenge links (`?t=…&s=…`) skip the home screen and start the same target with "BEAT xx%" on screen. The round clock starts on the first shot.
 - `js/audio.js`: synthesized sound effects (no audio files).
 
 ## API (Vercel functions in `api/`)

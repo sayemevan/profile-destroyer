@@ -3,6 +3,7 @@
 import { CW, CH } from './card.js';
 import { drawGunman } from './gunman.js';
 import { BRAND } from './brand.js';
+import { targetLabel } from './targets.js';
 
 const S = 1080;
 const SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
@@ -82,8 +83,7 @@ export async function makeShareImage({ dmg, original, pct, profile, weapon }) {
   g.restore();
 
   // subline + footer
-  const who = profile.url ? `@${profile.handle}'s ${profile.service.name} profile` : 'this profile';
-  const line = `I blasted ${who} with a ${weapon.name.toLowerCase()}`;
+  const line = `I blasted ${targetLabel(profile)} with a ${weapon.name.toLowerCase()}`;
   g.fillStyle = '#ffffff';
   fit(g, line, 780, 34, 22, 700);
   g.fillText(line, S / 2 + 50, 925);
@@ -171,11 +171,13 @@ function pill(g, text, x, y, bg, fg) {
 export function shareLink(profile, pct) {
   const base = location.origin + location.pathname;
   if (!profile.url) return base;
-  return `${base}?t=${encodeURIComponent(profile.url)}&s=${pct}`;
+  // A private profile's name (typed by the player) rides along so friends see it too.
+  const name = profile.private && profile.name !== 'Mystery User' ? `&n=${encodeURIComponent(profile.name)}` : '';
+  return `${base}?t=${encodeURIComponent(profile.url)}&s=${pct}${name}`;
 }
 
 export function shareText(profile, pct, weapon) {
-  const who = profile.url ? `@${profile.handle}'s ${profile.service.name} profile` : 'this profile';
+  const who = targetLabel(profile);
   const gun = weapon ? ` with a ${weapon.name.toLowerCase()}` : '';
   return `💥🔫 I destroyed ${pct}% of ${who}${gun} on Profile Destroyer. Can you beat that?`;
 }

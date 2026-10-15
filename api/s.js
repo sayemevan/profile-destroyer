@@ -23,10 +23,11 @@ export default async function handler(req, res) {
   }
 
   const image = meta.image.startsWith('http') ? meta.image : base + meta.image;
-  const who = meta.target ? `@${meta.handle}'s ${meta.service} profile` : 'this profile';
+  const who = meta.label || (meta.target ? `@${meta.handle}'s ${meta.service} profile` : 'this profile');
   const title = `${meta.pct}% DESTROYED 💥 ${who}`;
   const desc = `Blasted with a ${meta.weapon || 'gun'} on Profile Destroyer by ${BRAND.name}. Think you can do more damage? Play free!`;
-  const game = meta.target ? `/?t=${encodeURIComponent(meta.target)}&s=${meta.pct}` : '/';
+  const name = meta.name ? `&n=${encodeURIComponent(meta.name)}` : '';
+  const game = meta.target ? `/?t=${encodeURIComponent(meta.target)}&s=${meta.pct}${name}` : '/';
   const e = escapeHtml;
 
   res.statusCode = 200;

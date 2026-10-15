@@ -1,9 +1,11 @@
-import { loadProfile, profileFromFile, imageFromFile, initialsAvatar } from './profile.js';
-import { Game } from './game.js';
+import { loadProfile, profileFromFile, imageFromFile } from './profile.js';
+import { Game, replayDamage } from './game.js';
 import { makeShareImage, shareLink, shareText, socialUrls, caption } from './share.js';
 import { sfx } from './audio.js';
 import { WEAPONS, WEAPON_ORDER } from './weapons.js';
 import { drawGun } from './gunman.js';
+import { PRESETS, presetProfile, targetLabel } from './targets.js';
+import { Clip } from './clip.js';
 
 const $ = id => document.getElementById(id);
 const SCREENS = ['home', 'game', 'result'];
@@ -13,11 +15,13 @@ let result = null;
 let imageBlob = null;
 let imageUrl = null;
 let shareUrl = null;
+let video = null;
 
 const params = new URLSearchParams(location.search);
 const challenge = {
   target: params.get('t'),
   score: /^\d{1,3}$/.test(params.get('s') || '') ? Math.min(100, Number(params.get('s'))) : null,
+  name: (params.get('n') || '').slice(0, 40),
 };
 
 const game = new Game($('stage'), {
@@ -30,6 +34,11 @@ const game = new Game($('stage'), {
   onEnd: showResult,
 });
 
+// The round is recorded as a video clip from the first shot until the score stamp.
+const clip = new Clip($('stage'));
+game.onBegin = () => clip.start();
+game.onFrame = () => clip.frame(game);
+
 function show(id) {
   for (const s of SCREENS) $(s).classList.toggle('active', s === id);
 }
@@ -39,44 +48,53 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => el.classList.remove('show'), 2000);
+  toast.t = setTimeout(() => el.classList.remove('show'), 2400);
 }
+
+const isChallengeTarget = () => challenge.score !== null && profile?.url && profile.url === challenge.target;
 
 // ---------------------------------------------------------------- home
 
-if (challenge.target) {
-  $('urlInput').value = challenge.target;
-  if (challenge.score !== null) {
-    $('challenge').textContent = `🔥 Someone destroyed ${challenge.score}% of this profile. Think you can beat it?`;
-    $('challenge').hidden = false;
+function loadTarget(input) {
+  if (input.startsWith('preset:')) {
+    const p = presetProfile(input.slice(7));
+    if (!p) throw new Error('That target no longer exists.');
+    return p;
   }
+  return loadProfile(input);
 }
 
 $('urlForm').addEventListener('submit', e => {
   e.preventDefault();
   sfx.unlock();
-  begin(() => loadProfile($('urlInput').value));
+  begin(() => loadTarget($('urlInput').value));
 });
 
-$('fileInput').addEventListener('change', e => {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (file) { sfx.unlock(); begin(() => profileFromFile(file)); }
-});
+for (const p of PRESETS) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'preset';
+  btn.innerHTML = `<span class="emoji">${p.emoji}</span>${p.name}`;
+  btn.addEventListener('click', () => { sfx.unlock(); begin(() => presetProfile(p.id)); });
+  $('presets').append(btn);
+}
+
+for (const [id, selfie] of [['fileInput', false], ['selfieInput', true]]) {
+  $(id).addEventListener('change', e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (file) { sfx.unlock(); begin(() => profileFromFile(file, { selfie })); }
+  });
+}
 
 async function begin(load) {
   $('homeError').hidden = true;
-  $('privatePanel').hidden = true;
   $('loading').hidden = false;
   try {
     profile = await load();
-    if (profile.hidden) {
-      $('privName').value = '';
-      $('privatePanel').hidden = false;
-      return;
-    }
     startGame();
   } catch (err) {
+    show('home');
     $('homeError').textContent = err.message || 'Could not load that profile.';
     $('homeError').hidden = false;
   } finally {
@@ -84,41 +102,29 @@ async function begin(load) {
   }
 }
 
-// Private Facebook profile: let the player supply the photo and name.
-function finishPrivate(avatar) {
-  const name = $('privName').value.trim();
-  if (name) {
-    profile.name = name;
-    profile.handle = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || profile.handle;
-  }
-  if (avatar) profile.avatar = avatar;
-  else if (name) profile.avatar = initialsAvatar(name.replace(/\W/g, ''), profile.service.color);
-  profile.hidden = false;
-  $('privatePanel').hidden = true;
-  startGame();
-}
-
-$('privFile').addEventListener('change', async e => {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  try {
-    finishPrivate(await imageFromFile(file));
-  } catch (err) {
-    $('homeError').textContent = err.message;
-    $('homeError').hidden = false;
-  }
-});
-$('privSkip').addEventListener('click', () => finishPrivate(null));
-
 function startGame() {
+  $('meterLabel').textContent = isChallengeTarget() ? `BEAT ${challenge.score}%` : 'DESTROYED';
   show('game');
   game.start(profile);
 }
 
+// A friend's challenge link drops you straight into the same target.
+if (challenge.target) {
+  $('urlInput').value = challenge.target.startsWith('preset:') ? '' : challenge.target;
+  if (challenge.score !== null) {
+    $('challenge').textContent = `🔥 Someone destroyed ${challenge.score}% of this. Think you can beat it?`;
+    $('challenge').hidden = false;
+  }
+  begin(async () => {
+    const p = await loadTarget(challenge.target);
+    if (p.private && challenge.name) p.name = challenge.name;
+    return p;
+  });
+}
+
 // ---------------------------------------------------------------- game
 
-$('quitBtn').addEventListener('click', () => { game.stop(); show('home'); });
+$('quitBtn').addEventListener('click', () => { game.stop(); clip.cancel(); show('home'); });
 $('muteBtn').addEventListener('click', () => { $('muteBtn').textContent = sfx.toggle() ? '🔇' : '🔊'; });
 
 // Weapon picker: works before and during a round; the choice is remembered.
@@ -156,23 +162,42 @@ buildWeaponBar();
 async function showResult(res) {
   result = res;
   const { pct } = res;
-  const canvas = await makeShareImage(res);
-  imageBlob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
-  if (imageUrl) URL.revokeObjectURL(imageUrl);
-  imageUrl = imageBlob ? URL.createObjectURL(imageBlob) : canvas.toDataURL('image/jpeg', 0.9);
-  $('resultImg').src = imageUrl;
 
   let msg = `${res.weapon.name} · ${res.hits} hits · best combo ${res.bestCombo}`;
-  if (challenge.score !== null && profile.url && profile.url === challenge.target) {
+  if (isChallengeTarget()) {
     msg = pct > challenge.score ? `You beat your friend's ${challenge.score}%! 🏆`
       : pct === challenge.score ? `Tied with your friend at ${challenge.score}%!`
       : `Your friend did ${challenge.score}%. Go again!`;
   }
   $('resultMsg').textContent = msg;
 
+  // Private profile played as a mystery card: offer to add the real photo/name now.
+  $('fixPanel').hidden = !profile.hidden;
+  $('fixName').value = profile.name === 'Mystery User' ? '' : profile.name;
+
+  video = null;
+  $('videoBtn').hidden = true;
+  clip.stop().then(v => {
+    if (result !== res || !v) return;
+    video = v;
+    $('videoBtn').hidden = false;
+  });
+
+  await renderShare();
+}
+
+// Builds the share image and links for the current result (again after a fix-up).
+async function renderShare() {
+  const res = result;
+  const canvas = await makeShareImage(res);
+  imageBlob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+  if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
+  imageUrl = imageBlob ? URL.createObjectURL(imageBlob) : canvas.toDataURL('image/jpeg', 0.9);
+  $('resultImg').src = imageUrl;
+
   // Start with the plain challenge link; swap in the short /s/<id> link (which
   // has the image as its preview) once the upload finishes.
-  shareUrl = shareLink(profile, pct);
+  shareUrl = shareLink(profile, res.pct);
   setSocialLinks();
   setPreparing(true);
   show('result');
@@ -182,6 +207,35 @@ async function showResult(res) {
   setSocialLinks();
   setPreparing(false);
 }
+
+// Re-draws the same wreckage on the real photo/name the player just added.
+async function applyFix(avatar) {
+  const name = $('fixName').value.trim();
+  if (name) {
+    profile.name = name;
+    profile.handle = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || profile.handle;
+  }
+  if (avatar) {
+    profile.avatar = avatar;
+    profile.hidden = false;
+  }
+  Object.assign(result, replayDamage(profile, result.ops));
+  $('fixPanel').hidden = !profile.hidden;
+  await renderShare();
+  toast(avatar ? 'Photo added!' : 'Name added!');
+}
+
+$('fixFile').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    await applyFix(await imageFromFile(file));
+  } catch (err) {
+    toast(err.message);
+  }
+});
+$('fixSave').addEventListener('click', () => applyFix(null));
 
 async function uploadShare(canvas, res) {
   try {
@@ -195,6 +249,8 @@ async function uploadShare(canvas, res) {
         service: profile.service.name,
         target: profile.url,
         weapon: res.weapon.name,
+        label: targetLabel(profile),
+        name: profile.private ? profile.name : '',
       }),
       signal: AbortSignal.timeout(15000),
     });
@@ -215,15 +271,23 @@ function setPreparing(on) {
   for (const id of ['fbBtn', 'waBtn', 'xBtn', 'copyBtn']) $(id).classList.toggle('busy', on);
 }
 
-function saveImage() {
+function download(href, name) {
   const a = document.createElement('a');
-  a.href = imageUrl;
-  a.download = `destroyed-${profile.handle}-${result.pct}.jpg`;
+  a.href = href;
+  a.download = name;
   a.click();
 }
 
+const saveImage = () => download(imageUrl, `destroyed-${profile.handle}-${result.pct}.jpg`);
+
 function imageFile() {
   return imageBlob && new File([imageBlob], `destroyed-${profile.handle}.jpg`, { type: 'image/jpeg' });
+}
+
+function videoFile() {
+  if (!video) return null;
+  const ext = video.type.includes('mp4') ? 'mp4' : 'webm';
+  return new File([video], `destroyed-${profile.handle}.${ext}`, { type: video.type });
 }
 
 // Post text with the game link and Sayem Dreams' page/channel, ready to paste.
@@ -232,18 +296,17 @@ function copyCaption() {
   return navigator.clipboard?.writeText(text).then(() => true, () => false) ?? Promise.resolve(false);
 }
 
-// Shares the picture itself. Text/links are left out on purpose: several apps
-// (Facebook, WhatsApp) drop the image when a link comes along with it. The caption
-// (with clickable links) goes to the clipboard instead, for pasting into the post.
-async function shareImage() {
-  const file = imageFile();
+// Shares a file (image or video) on its own. Text/links are left out on purpose:
+// several apps (Facebook, WhatsApp) drop the file when a link comes along with it.
+// The caption (with clickable links) goes to the clipboard instead, for pasting.
+async function shareFile(file) {
   const copied = copyCaption(); // started before share() so the tap still counts for it
   if (file && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
       if (await copied) toast('Caption with links copied. Paste it in your post!');
     } catch (err) {
-      if (err.name !== 'AbortError') toast('Sharing failed. Try Save image instead.');
+      if (err.name !== 'AbortError') toast('Sharing failed. Try saving it instead.');
     }
     return true;
   }
@@ -251,19 +314,26 @@ async function shareImage() {
 }
 
 $('shareBtn').addEventListener('click', async () => {
-  if (await shareImage()) return;
+  if (await shareFile(imageFile())) return;
   saveImage();
   toast((await copyCaption()) ? 'Image saved & caption copied. Post it anywhere!' : 'Image saved. Post it anywhere!');
 });
 
-// Facebook's web share can only post a link (no image, no text). On phones, hand
-// the image to the Facebook app instead; on desktop fall back to the link share.
-$('fbBtn').addEventListener('click', e => {
-  const file = imageFile();
-  if (file && navigator.canShare?.({ files: [file] })) {
-    e.preventDefault();
-    shareImage();
-  }
+$('videoBtn').addEventListener('click', async () => {
+  const file = videoFile();
+  if (!file || await shareFile(file)) return;
+  const url = URL.createObjectURL(file);
+  download(url, file.name);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  toast((await copyCaption()) ? 'Video saved & caption copied!' : 'Video saved!');
+});
+
+// Opens Facebook straight away (like WhatsApp) with the share link; the
+// before/after picture shows as the link preview. Facebook doesn't allow
+// prefilled post text, so the caption with the page/channel links is copied
+// for pasting. (Posting the photo itself needs the share sheet: "Share image".)
+$('fbBtn').addEventListener('click', () => {
+  copyCaption().then(ok => ok && toast('Caption copied. Paste it in your Facebook post!'));
 });
 
 $('dlBtn').addEventListener('click', saveImage);
@@ -278,4 +348,8 @@ $('copyBtn').addEventListener('click', async () => {
 });
 
 $('againBtn').addEventListener('click', startGame);
-$('newBtn').addEventListener('click', () => { $('urlInput').value = ''; show('home'); });
+$('newBtn').addEventListener('click', () => {
+  $('urlInput').value = '';
+  $('homeError').hidden = true;
+  show('home');
+});

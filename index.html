@@ -24,15 +24,12 @@
              placeholder="https://x.com/username" aria-label="Profile link">
       <button type="submit" class="btn primary">Load target</button>
     </form>
-    <div class="or">or</div>
-    <label class="btn ghost">Upload a photo<input id="fileInput" type="file" accept="image/*" hidden></label>
     <p id="homeError" class="error" hidden></p>
-    <div id="privatePanel" class="private-panel" hidden>
-      <p><b>Found the profile!</b> But Facebook hides this person's name and photo from anyone who isn't logged in. Add them yourself:</p>
-      <input id="privName" type="text" maxlength="40" placeholder="Their name (optional)" aria-label="Their name">
-      <label class="btn primary">Add their photo<input id="privFile" type="file" accept="image/*" hidden></label>
-      <button id="privSkip" type="button" class="btn ghost">Play without a photo</button>
-      <p class="fine">Tip: screenshot their profile picture, then pick it here.</p>
+    <div class="or">or tap a quick target</div>
+    <div id="presets" class="presets"></div>
+    <div class="row quick">
+      <label class="btn ghost">🤳 Selfie<input id="selfieInput" type="file" accept="image/*" capture="user" hidden></label>
+      <label class="btn ghost">🖼️ Photo<input id="fileInput" type="file" accept="image/*" hidden></label>
     </div>
     <p class="examples">Works with X, Instagram, GitHub, YouTube, TikTok, Reddit, Twitch, Bluesky, Threads…</p>
     <p class="fine">Just for laughs. Nothing happens to the real account.</p>
@@ -50,7 +47,7 @@
     <div class="hud">
       <button id="quitBtn" class="icon-btn" aria-label="Back">✕</button>
       <div class="meter">
-        <div class="meter-top"><span>DESTROYED</span><b id="pct">0%</b></div>
+        <div class="meter-top"><span id="meterLabel">DESTROYED</span><b id="pct">0%</b></div>
         <div class="bar"><div id="bar"></div></div>
       </div>
       <div id="timer" class="timer">15</div>
@@ -59,14 +56,23 @@
     <div id="weapons" class="weapons" role="radiogroup" aria-label="Choose your gun"></div>
     <div id="combo" class="combo"></div>
     <div id="countdown" class="countdown"></div>
-    <div id="hint" class="hint">Pick a gun · Tap to shoot · Hold &amp; slide to spray</div>
+    <div id="hint" class="hint">Pick a gun · Tap to start · Hold to spray</div>
   </section>
 
   <section id="result" class="screen">
     <p id="resultMsg" class="result-msg"></p>
     <img id="resultImg" class="result-img" alt="The destroyed profile">
     <div class="result-actions">
+      <div id="fixPanel" class="private-panel" hidden>
+        <p><b>Who was it?</b> Facebook hides this profile's photo. Add it for a better share image (optional):</p>
+        <input id="fixName" type="text" maxlength="40" placeholder="Their name" aria-label="Their name">
+        <div class="row">
+          <label class="btn primary">Add photo<input id="fixFile" type="file" accept="image/*" hidden></label>
+          <button id="fixSave" type="button" class="btn ghost">Use name</button>
+        </div>
+      </div>
       <button id="shareBtn" class="btn primary wide">Share image 💥</button>
+      <button id="videoBtn" class="btn wide video" hidden>Share video 🎬</button>
       <div class="row">
         <a id="fbBtn" class="btn social" target="_blank" rel="noopener">Facebook</a>
         <a id="waBtn" class="btn social" target="_blank" rel="noopener">WhatsApp</a>

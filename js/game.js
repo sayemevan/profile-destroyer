@@ -43,6 +43,7 @@ export class Game {
       c.setPointerCapture?.(e.pointerId);
       pos(e);
       p.down = true;
+      if (this.state === 'ready') this.begin();
       if (this.state === 'play' && this.cool <= 0) { this.fire(); this.cool = this.weapon.gap; }
       this.ui.hint.classList.add('gone');
     });
@@ -57,6 +58,7 @@ export class Game {
     this.original = renderCard(profile);
     this.dmg = renderCard(profile);
     this.dctx = this.dmg.getContext('2d', { willReadFrequently: true });
+    this.ops = [];          // every bit of damage, so it can be replayed on another photo
     this.cells = new Uint8Array(TOTAL);
     this.destroyed = 0;
     this.bullets = [];
@@ -79,9 +81,9 @@ export class Game {
     this.layout();
     this.man = { x: this.W / 2, aim: -Math.PI / 2, walk: 0, moving: 0, recoil: 0, flash: 0 };
 
-    this.state = 'count';
-    this.countT = 3.999;
-    this.lastCount = 4;
+    // The clock starts on the first shot, so there's time to pick a gun.
+    this.state = 'ready';
+    this.ui.countdown.textContent = '';
     this.ui.hint.classList.remove('gone');
     this.ui.timer.textContent = ROUND;
     this.ui.timer.classList.remove('hurry');
@@ -91,6 +93,14 @@ export class Game {
     this.running = true;
     this.last = performance.now();
     requestAnimationFrame(this.loop);
+  }
+
+  begin() {
+    this.state = 'play';
+    this.flashText('GO!');
+    sfx.go();
+    this.onBegin?.();
+    setTimeout(() => this.state === 'play' && (this.ui.countdown.textContent = ''), 500);
   }
 
   setWeapon(id) {
@@ -156,7 +166,9 @@ export class Game {
     const dt = Math.min(0.033, (now - this.last) / 1000);
     this.last = now;
     this.update(dt);
+    if (!this.running) return;
     this.draw();
+    this.onFrame?.();
     requestAnimationFrame(this.loop);
   }
 
@@ -182,15 +194,7 @@ export class Game {
     m.recoil = Math.max(0, m.recoil - dt * 9);
     m.flash = Math.max(0, m.flash - dt * 14);
 
-    if (this.state === 'count') {
-      this.countT -= dt;
-      const n = Math.ceil(this.countT);
-      if (n !== this.lastCount) {
-        this.lastCount = n;
-        if (n > 0) { this.flashText(String(n)); sfx.tick(); }
-        else { this.flashText('DESTROY!'); sfx.go(); this.state = 'play'; setTimeout(() => this.state === 'play' && (this.ui.countdown.textContent = ''), 600); }
-      }
-    } else if (this.state === 'play') {
+    if (this.state === 'play') {
       const before = Math.ceil(this.time);
       this.time -= dt;
       const secs = Math.max(0, Math.ceil(this.time));
@@ -385,35 +389,21 @@ export class Game {
   }
 
   punch(x, y, r, big) {
-    const g = this.dctx;
-    g.save();
-    g.scale(RES, RES);
-
-    // scorch + cracks only paint on what's left of the card
-    g.globalCompositeOperation = 'source-atop';
-    const rg = g.createRadialGradient(x, y, r * 0.5, x, y, r * 2.3);
-    rg.addColorStop(0, 'rgba(25,12,0,.8)');
-    rg.addColorStop(1, 'rgba(25,12,0,0)');
-    g.fillStyle = rg;
-    g.beginPath(); g.arc(x, y, r * 2.3, 0, TAU); g.fill();
-
-    g.strokeStyle = 'rgba(0,0,0,.6)';
-    g.lineWidth = big ? 2 : 1.2;
-    const cracks = big ? 9 : Math.floor(rand(3, 6));
-    for (let i = 0; i < cracks; i++) {
+    const cracks = new Path2D();
+    const n = big ? 9 : Math.floor(rand(3, 6));
+    for (let i = 0; i < n; i++) {
       let a = rand(0, TAU), cx = x, cy = y;
       const len = r * rand(1.6, big ? 4.5 : 3.4);
-      g.beginPath(); g.moveTo(cx, cy);
+      cracks.moveTo(cx, cy);
       for (let s = 0; s < 4; s++) {
         a += rand(-0.5, 0.5);
         cx += Math.cos(a) * len / 4; cy += Math.sin(a) * len / 4;
-        g.lineTo(cx, cy);
+        cracks.lineTo(cx, cy);
       }
-      g.stroke();
     }
-
-    g.restore();
-    this.erase(jaggedPath(x, y, r, 12, 0.65));
+    const op = { type: 'punch', x, y, r, big, cracks, hole: jaggedPath(x, y, r, 12, 0.65) };
+    this.ops.push(op);
+    applyDamage(this.dctx, this.original, op);
   }
 
   breakChunk(cx, cy, R) {
@@ -436,7 +426,9 @@ export class Game {
     sg.strokeStyle = 'rgba(0,0,0,.45)';
     sg.lineWidth = 2;
     sg.stroke(shape);
-    this.erase(shape);
+    const op = { type: 'chunk', shape };
+    this.ops.push(op);
+    applyDamage(this.dctx, this.original, op);
     this.mark(cx, cy, R * 0.85);
 
     const s = this.toScreen(cx, cy);
@@ -444,24 +436,6 @@ export class Game {
       img: spr, x: s.x, y: s.y, size: size * this.scale,
       vx: rand(-160, 160), vy: rand(-320, -100), rot: this.angle, vr: rand(-7, 7),
     });
-  }
-
-  // Cut a shape out of the card. Inside the profile photo, a faded copy of the
-  // face stays behind so you can still tell whose profile got wrecked.
-  erase(path) {
-    const g = this.dctx;
-    g.save();
-    g.scale(RES, RES);
-    g.globalCompositeOperation = 'destination-out';
-    g.fill(path);
-    g.globalCompositeOperation = 'source-over';
-    g.beginPath();
-    g.arc(AVATAR.x, AVATAR.y, AVATAR.r, 0, TAU);
-    g.clip();
-    g.clip(path);
-    g.globalAlpha = 0.45;
-    g.drawImage(this.original, 0, 0, CW, CH);
-    g.restore();
   }
 
   mark(cx, cy, r) {
@@ -496,6 +470,7 @@ export class Game {
       shots: this.shots,
       bestCombo: this.bestCombo,
       original: this.original,
+      ops: this.ops,
       weapon: this.weapon,
     };
   }
@@ -638,6 +613,56 @@ export class Game {
       g.stroke();
     }
   }
+}
+
+// ---------------------------------------------------------------- damage
+// Damage is kept as a list of ops so the exact same wreckage can be redrawn on a
+// different photo later (e.g. when someone adds the real picture after playing).
+
+function applyDamage(g, original, op) {
+  g.save();
+  g.scale(RES, RES);
+  if (op.type === 'punch') {
+    // scorch + cracks only paint on what's left of the card
+    const { x, y, r } = op;
+    g.globalCompositeOperation = 'source-atop';
+    const rg = g.createRadialGradient(x, y, r * 0.5, x, y, r * 2.3);
+    rg.addColorStop(0, 'rgba(25,12,0,.8)');
+    rg.addColorStop(1, 'rgba(25,12,0,0)');
+    g.fillStyle = rg;
+    g.beginPath(); g.arc(x, y, r * 2.3, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.6)';
+    g.lineWidth = op.big ? 2 : 1.2;
+    g.stroke(op.cracks);
+  }
+  g.restore();
+  erase(g, original, op.type === 'punch' ? op.hole : op.shape);
+}
+
+// Cut a shape out of the card. Inside the profile photo, a faded copy of the
+// face stays behind so you can still tell whose profile got wrecked.
+function erase(g, original, path) {
+  g.save();
+  g.scale(RES, RES);
+  g.globalCompositeOperation = 'destination-out';
+  g.fill(path);
+  g.globalCompositeOperation = 'source-over';
+  g.beginPath();
+  g.arc(AVATAR.x, AVATAR.y, AVATAR.r, 0, TAU);
+  g.clip();
+  g.clip(path);
+  g.globalAlpha = 0.45;
+  g.drawImage(original, 0, 0, CW, CH);
+  g.restore();
+}
+
+// Redraw a finished round's damage onto a (possibly updated) profile card.
+export function replayDamage(profile, ops) {
+  const original = renderCard(profile);
+  const dmg = renderCard(profile);
+  const g = dmg.getContext('2d');
+  for (const op of ops) applyDamage(g, original, op);
+  return { original, dmg };
 }
 
 function jaggedPath(x, y, r, n, rough) {

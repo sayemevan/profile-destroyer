@@ -1,3 +1,5 @@
+import { mysteryAvatar } from './targets.js';
+
 // Turns a pasted profile link into { service, handle, name, bio, stats, avatar }.
 // The server (/api/profile) reads the page's public name + picture and resolves
 // Facebook share links; pictures go through /api/img so the canvas stays exportable.
@@ -109,8 +111,11 @@ export async function loadProfile(input) {
 
   const profile = {
     service: svc, handle: shownHandle, url,
-    hidden: target.hidden,   // exists, but shows no name/photo to logged-out visitors
-    name: target.name || (target.hidden ? 'Facebook User' : handle),
+    // exists, but shows no name/photo to logged-out visitors: play with a mystery
+    // card, the player can add the real photo/name after the round
+    hidden: target.hidden,
+    private: target.hidden,
+    name: target.name || (target.hidden ? nameFromHandle(handle) || 'Mystery User' : handle),
     bio: GAG_BIOS[Math.floor(Math.random() * GAG_BIOS.length)],
     stats: GAG_STATS,
     avatar: null,
@@ -139,6 +144,7 @@ export async function loadProfile(input) {
   for (const src of sources) {
     try { profile.avatar = await loadImage(proxied(src), 9000); break; } catch { /* try next */ }
   }
+  if (!profile.avatar && profile.hidden) profile.avatar = mysteryAvatar();
   if (!profile.avatar) profile.avatar = initialsAvatar(profile.name.replace(/\W/g, '') || handle, svc.color);
   return profile;
 }
@@ -173,13 +179,22 @@ export async function imageFromFile(file) {
   return loadImage(URL.createObjectURL(file), 15000);
 }
 
-export async function profileFromFile(file) {
+// "sayem.sikder96" → "Sayem Sikder"; numeric IDs give nothing.
+export function nameFromHandle(handle) {
+  if (!handle || /^\d+$/.test(handle)) return null;
+  const words = handle.replace(/\d+/g, ' ').split(/[._\-\s]+/).filter(w => w.length > 1);
+  if (!words.length) return null;
+  return words.slice(0, 3).map(w => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+
+export async function profileFromFile(file, { selfie = false } = {}) {
   const avatar = await imageFromFile(file);
   return {
-    service: { id: 'photo', name: 'Photo', color: '#ff3b7a' },
-    handle: 'mystery_target',
+    service: { id: 'photo', name: selfie ? 'Selfie' : 'Photo', color: '#ff3b7a' },
+    handle: selfie ? 'me' : 'mystery_target',
     url: null,
-    name: 'Mystery Target',
+    selfie,
+    name: selfie ? 'Me' : 'Mystery Target',
     bio: GAG_BIOS[Math.floor(Math.random() * GAG_BIOS.length)],
     stats: GAG_STATS,
     avatar,
