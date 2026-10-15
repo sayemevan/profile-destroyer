@@ -27,8 +27,22 @@
     <div class="or">or</div>
     <label class="btn ghost">Upload a photo<input id="fileInput" type="file" accept="image/*" hidden></label>
     <p id="homeError" class="error" hidden></p>
+    <div id="privatePanel" class="private-panel" hidden>
+      <p><b>Found the profile!</b> But Facebook hides this person's name and photo from anyone who isn't logged in. Add them yourself:</p>
+      <input id="privName" type="text" maxlength="40" placeholder="Their name (optional)" aria-label="Their name">
+      <label class="btn primary">Add their photo<input id="privFile" type="file" accept="image/*" hidden></label>
+      <button id="privSkip" type="button" class="btn ghost">Play without a photo</button>
+      <p class="fine">Tip: screenshot their profile picture, then pick it here.</p>
+    </div>
     <p class="examples">Works with X, Instagram, GitHub, YouTube, TikTok, Reddit, Twitch, Bluesky, Threads…</p>
     <p class="fine">Just for laughs. Nothing happens to the real account.</p>
+    <div class="follow" id="followHome">
+      <span>Made by <b>Sayem Dreams</b></span>
+      <div class="row">
+        <a class="btn follow-fb" href="https://www.facebook.com/sayemdreams" target="_blank" rel="noopener">👍 Follow</a>
+        <a class="btn follow-yt" href="https://www.youtube.com/@SayemDreams?sub_confirmation=1" target="_blank" rel="noopener">▶ Subscribe</a>
+      </div>
+    </div>
   </main>
 
   <section id="game" class="screen">
@@ -61,6 +75,13 @@
       <div class="row">
         <button id="dlBtn" class="btn ghost">Save image</button>
         <button id="copyBtn" class="btn ghost">Copy link</button>
+      </div>
+      <div class="follow" id="followResult">
+        <span>Made by <b>Sayem Dreams</b></span>
+        <div class="row">
+          <a class="btn follow-fb" href="https://www.facebook.com/sayemdreams" target="_blank" rel="noopener">👍 Follow</a>
+          <a class="btn follow-yt" href="https://www.youtube.com/@SayemDreams?sub_confirmation=1" target="_blank" rel="noopener">▶ Subscribe</a>
+        </div>
       </div>
       <div class="row">
         <button id="againBtn" class="btn">Play again</button>

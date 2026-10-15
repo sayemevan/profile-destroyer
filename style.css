@@ -58,6 +58,15 @@ body {
 .examples { color: var(--muted); font-size: 13px; margin: 6px 0 0; max-width: 420px; }
 .fine { color: #7d7299; font-size: 12px; margin: 0; }
 .error { color: #ff9b9b; font-weight: 600; margin: 0; max-width: 440px; }
+.private-panel {
+  display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 440px; text-align: left;
+  background: var(--card); border: 2px solid var(--yellow); border-radius: 14px; padding: 14px;
+}
+.private-panel[hidden] { display: none; }
+.private-panel p { margin: 0; }
+.private-panel input {
+  padding: 12px; font-size: 16px; border-radius: 12px; border: 3px solid #000; background: #fff; color: #111;
+}
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -73,6 +82,16 @@ body {
 .btn.social { background: var(--card); color: var(--ink); border-color: var(--ink); box-shadow: 4px 4px 0 var(--line); flex: 1; font-size: 14px; padding: 12px 8px; }
 .btn.wide { width: 100%; }
 .btn.busy { opacity: .45; pointer-events: none; }
+.follow {
+  width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 8px; align-items: center;
+  padding: 12px; border-radius: 14px; background: rgba(0,0,0,.25); border: 2px dashed var(--line);
+}
+.follow span { color: var(--muted); font-size: 14px; }
+.follow span b { color: #fff; }
+.follow .row { width: 100%; }
+.follow .btn { white-space: nowrap; gap: 6px; font-size: 15px; padding: 12px 10px; }
+.btn.follow-fb { background: #1877f2; color: #fff; }
+.btn.follow-yt { background: #ff0000; color: #fff; }
 
 /* ---------- game ---------- */
 #game { padding: 0; }

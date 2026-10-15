@@ -24,19 +24,39 @@ export default async function handler(req, res) {
     let url = tags['og:url'] || finalUrl;
     try { if (!isProfileHost(new URL(url).hostname)) url = finalUrl; } catch { url = finalUrl; }
 
+    url = canonical(url);
     const name = cleanName(tags['og:title'] || tags['twitter:title'] || '');
     let image = tags['og:image'] || tags['twitter:image'] || null;
     if (image?.includes('pbs.twimg.com/profile_images/')) image = image.replace('_200x200.', '_400x400.');
     const loginWall = /\/login|checkpoint/.test(url);
     if (loginWall) return sendJson(res, 404, { error: 'profile not public' }, DAY);
 
-    return sendJson(res, 200, {
+    const result = {
       url,
       name: name && !BAD_TITLES.test(name) ? name : null,
       image: image && /^https:\/\//.test(image) ? image : null,
-    }, DAY);
+    };
+    // Profile exists but shows nothing to logged-out visitors (private Facebook profiles).
+    result.hidden = !result.name && !result.image;
+    return sendJson(res, 200, result, DAY);
   } catch (err) {
     return sendJson(res, 502, { error: err.message });
+  }
+}
+
+// Drop tracking params Facebook adds when it redirects a share link
+// (…/profile.php?id=123&rdid=…&share_url=…).
+function canonical(url) {
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)facebook\.com$/.test(u.hostname)) return url;
+    const id = u.pathname === '/profile.php' && u.searchParams.get('id');
+    u.search = id ? `?id=${id}` : '';
+    u.hash = '';
+    u.hostname = 'www.facebook.com';
+    return u.href;
+  } catch {
+    return url;
   }
 }
 

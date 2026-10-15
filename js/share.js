@@ -2,6 +2,7 @@
 
 import { CW, CH } from './card.js';
 import { drawGunman } from './gunman.js';
+import { BRAND } from './brand.js';
 
 const S = 1080;
 const SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
@@ -85,13 +86,56 @@ export async function makeShareImage({ dmg, original, pct, profile, weapon }) {
   const line = `I blasted ${who} with a ${weapon.name.toLowerCase()}`;
   g.fillStyle = '#ffffff';
   fit(g, line, 780, 34, 22, 700);
-  g.fillText(line, S / 2 + 50, 935);
-  g.fillStyle = '#b3a8cf';
-  g.font = `600 28px ${SANS}`;
-  g.fillText(`Your turn → ${location.host}`, S / 2 + 50, 992);
+  g.fillText(line, S / 2 + 50, 925);
+  g.fillStyle = '#d9d0f2';
+  g.font = `600 26px ${SANS}`;
+  g.fillText(`Your turn → ${location.host}`, S / 2 + 50, 968);
+  brandBar(g, S / 2 + 55, 1030);
 
   drawGunman(g, 95, 1062, 1.45, -0.95, { flash: 1, gun: weapon.id });
   return c;
+}
+
+// "Follow  [f] fb.com/sayemdreams   [▶] @SayemDreams"
+function brandBar(g, cx, cy) {
+  const fb = BRAND.facebookShort, yt = BRAND.youtubeHandle;
+  g.save();
+  g.font = `700 27px ${SANS}`;
+  const label = 'Follow';
+  const wl = g.measureText(label).width, wf = g.measureText(fb).width, wy = g.measureText(yt).width;
+  const icon = 34, gap = 10, sep = 30;
+  const w = 28 + wl + sep + icon + gap + wf + sep + icon + gap + wy + 28;
+  let x = cx - w / 2;
+  g.fillStyle = '#ffd23f';
+  g.strokeStyle = '#000';
+  g.lineWidth = 4;
+  g.beginPath(); g.roundRect(x, cy - 30, w, 60, 30); g.fill(); g.stroke();
+  g.textAlign = 'left';
+  g.textBaseline = 'middle';
+  g.fillStyle = '#111';
+  x += 28;
+  g.fillText(label, x, cy + 1); x += wl + sep;
+  // Facebook "f"
+  g.fillStyle = '#1877f2';
+  g.beginPath(); g.arc(x + icon / 2, cy, icon / 2, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#fff';
+  g.font = `900 26px ${SANS}`;
+  g.textAlign = 'center';
+  g.fillText('f', x + icon / 2 + 1, cy + 3);
+  g.textAlign = 'left';
+  g.font = `700 27px ${SANS}`;
+  x += icon + gap;
+  g.fillStyle = '#111';
+  g.fillText(fb, x, cy + 1); x += wf + sep;
+  // YouTube play button
+  g.fillStyle = '#ff0000';
+  g.beginPath(); g.roundRect(x, cy - 12, icon, 24, 7); g.fill();
+  g.fillStyle = '#fff';
+  g.beginPath(); g.moveTo(x + 13, cy - 6); g.lineTo(x + 23, cy); g.lineTo(x + 13, cy + 6); g.closePath(); g.fill();
+  x += icon + gap;
+  g.fillStyle = '#111';
+  g.fillText(yt, x, cy + 1);
+  g.restore();
 }
 
 function card(g, img, x, y, w, h, rot) {
@@ -136,12 +180,20 @@ export function shareText(profile, pct, weapon) {
   return `💥🔫 I destroyed ${pct}% of ${who}${gun} on Profile Destroyer. Can you beat that?`;
 }
 
+// Full post text with clickable links: the game, plus Sayem Dreams' page and channel.
+export function caption(text, link) {
+  return `${text}\n👉 Play: ${link}\n\nMade by ${BRAND.name} 💛\nFollow: ${BRAND.facebook}\nSubscribe: ${BRAND.youtube.replace('?sub_confirmation=1', '')}\n${BRAND.hashtag}`;
+}
+
 export function socialUrls(text, link) {
-  const t = encodeURIComponent(text), u = encodeURIComponent(link);
+  const u = encodeURIComponent(link);
+  // X counts every link as 23 characters, so this stays well under 280.
+  const tweet = `${text}\n\nMade by ${BRAND.name} ▶ ${BRAND.youtube.replace('?sub_confirmation=1', '')} ${BRAND.hashtag}`;
   return {
-    x: `https://twitter.com/intent/tweet?text=${t}&url=${u}`,
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}&quote=${t}`,
-    whatsapp: `https://wa.me/?text=${encodeURIComponent(text + ' ' + link)}`,
+    x: `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${u}`,
+    // Facebook ignores prefilled text; the link preview (og:image) and hashtag are what show up.
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}&hashtag=${encodeURIComponent(BRAND.hashtag)}`,
+    whatsapp: `https://wa.me/?text=${encodeURIComponent(caption(text, link))}`,
   };
 }
 

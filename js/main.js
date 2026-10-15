@@ -1,6 +1,6 @@
-import { loadProfile, profileFromFile } from './profile.js';
+import { loadProfile, profileFromFile, imageFromFile, initialsAvatar } from './profile.js';
 import { Game } from './game.js';
-import { makeShareImage, shareLink, shareText, socialUrls } from './share.js';
+import { makeShareImage, shareLink, shareText, socialUrls, caption } from './share.js';
 import { sfx } from './audio.js';
 import { WEAPONS, WEAPON_ORDER } from './weapons.js';
 import { drawGun } from './gunman.js';
@@ -66,17 +66,54 @@ $('fileInput').addEventListener('change', e => {
 
 async function begin(load) {
   $('homeError').hidden = true;
+  $('privatePanel').hidden = true;
   $('loading').hidden = false;
   try {
     profile = await load();
-    show('game');
-    game.start(profile);
+    if (profile.hidden) {
+      $('privName').value = '';
+      $('privatePanel').hidden = false;
+      return;
+    }
+    startGame();
   } catch (err) {
     $('homeError').textContent = err.message || 'Could not load that profile.';
     $('homeError').hidden = false;
   } finally {
     $('loading').hidden = true;
   }
+}
+
+// Private Facebook profile: let the player supply the photo and name.
+function finishPrivate(avatar) {
+  const name = $('privName').value.trim();
+  if (name) {
+    profile.name = name;
+    profile.handle = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || profile.handle;
+  }
+  if (avatar) profile.avatar = avatar;
+  else if (name) profile.avatar = initialsAvatar(name.replace(/\W/g, ''), profile.service.color);
+  profile.hidden = false;
+  $('privatePanel').hidden = true;
+  startGame();
+}
+
+$('privFile').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    finishPrivate(await imageFromFile(file));
+  } catch (err) {
+    $('homeError').textContent = err.message;
+    $('homeError').hidden = false;
+  }
+});
+$('privSkip').addEventListener('click', () => finishPrivate(null));
+
+function startGame() {
+  show('game');
+  game.start(profile);
 }
 
 // ---------------------------------------------------------------- game
@@ -185,20 +222,48 @@ function saveImage() {
   a.click();
 }
 
+function imageFile() {
+  return imageBlob && new File([imageBlob], `destroyed-${profile.handle}.jpg`, { type: 'image/jpeg' });
+}
+
+// Post text with the game link and Sayem Dreams' page/channel, ready to paste.
+function copyCaption() {
+  const text = caption(shareText(profile, result.pct, result.weapon), shareUrl);
+  return navigator.clipboard?.writeText(text).then(() => true, () => false) ?? Promise.resolve(false);
+}
+
 // Shares the picture itself. Text/links are left out on purpose: several apps
-// (Facebook, WhatsApp) drop the image when a link comes along with it.
-$('shareBtn').addEventListener('click', async () => {
-  const file = imageBlob && new File([imageBlob], `destroyed-${profile.handle}.jpg`, { type: 'image/jpeg' });
+// (Facebook, WhatsApp) drop the image when a link comes along with it. The caption
+// (with clickable links) goes to the clipboard instead, for pasting into the post.
+async function shareImage() {
+  const file = imageFile();
+  const copied = copyCaption(); // started before share() so the tap still counts for it
   if (file && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
+      if (await copied) toast('Caption with links copied. Paste it in your post!');
     } catch (err) {
       if (err.name !== 'AbortError') toast('Sharing failed. Try Save image instead.');
     }
-    return;
+    return true;
   }
+  return false;
+}
+
+$('shareBtn').addEventListener('click', async () => {
+  if (await shareImage()) return;
   saveImage();
-  toast('Image saved. Post it anywhere!');
+  toast((await copyCaption()) ? 'Image saved & caption copied. Post it anywhere!' : 'Image saved. Post it anywhere!');
+});
+
+// Facebook's web share can only post a link (no image, no text). On phones, hand
+// the image to the Facebook app instead; on desktop fall back to the link share.
+$('fbBtn').addEventListener('click', e => {
+  const file = imageFile();
+  if (file && navigator.canShare?.({ files: [file] })) {
+    e.preventDefault();
+    shareImage();
+  }
 });
 
 $('dlBtn').addEventListener('click', saveImage);
@@ -212,5 +277,5 @@ $('copyBtn').addEventListener('click', async () => {
   }
 });
 
-$('againBtn').addEventListener('click', () => { show('game'); game.start(profile); });
+$('againBtn').addEventListener('click', startGame);
 $('newBtn').addEventListener('click', () => { $('urlInput').value = ''; show('home'); });

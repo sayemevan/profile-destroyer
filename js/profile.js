@@ -102,11 +102,15 @@ export async function loadProfile(input) {
     }
     if (info?.image) sources.push(info.image);
     if (info?.name) target.name = info.name;
+    target.hidden = !!info?.hidden;
   }
+  // Numeric Facebook IDs (profile.php?id=…) make an ugly @handle.
+  const shownHandle = /^\d{6,}$/.test(handle) ? 'facebook_user' : handle;
 
   const profile = {
-    service: svc, handle, url,
-    name: target.name || handle,
+    service: svc, handle: shownHandle, url,
+    hidden: target.hidden,   // exists, but shows no name/photo to logged-out visitors
+    name: target.name || (target.hidden ? 'Facebook User' : handle),
     bio: GAG_BIOS[Math.floor(Math.random() * GAG_BIOS.length)],
     stats: GAG_STATS,
     avatar: null,
@@ -129,13 +133,13 @@ export async function loadProfile(input) {
       if (e.message.startsWith('No GitHub')) throw e;
     }
   }
-  if (svc.avatar) sources.push(`https://unavatar.io/${svc.avatar}/${encodeURIComponent(handle)}?fallback=false`);
+  if (svc.avatar && !target.hidden) sources.push(`https://unavatar.io/${svc.avatar}/${encodeURIComponent(handle)}?fallback=false`);
   if (svc.site) sources.push(`https://unavatar.io/${encodeURIComponent(svc.site)}?fallback=false`);
 
   for (const src of sources) {
     try { profile.avatar = await loadImage(proxied(src), 9000); break; } catch { /* try next */ }
   }
-  if (!profile.avatar) profile.avatar = initialsAvatar(handle, svc.color);
+  if (!profile.avatar) profile.avatar = initialsAvatar(profile.name.replace(/\W/g, '') || handle, svc.color);
   return profile;
 }
 
@@ -164,10 +168,13 @@ function safeParse(url) {
   try { return parseTarget(url); } catch { return null; }
 }
 
-export async function profileFromFile(file) {
+export async function imageFromFile(file) {
   if (!file.type.startsWith('image/')) throw new Error('Please pick an image file.');
-  const src = URL.createObjectURL(file);
-  const avatar = await loadImage(src, 15000);
+  return loadImage(URL.createObjectURL(file), 15000);
+}
+
+export async function profileFromFile(file) {
+  const avatar = await imageFromFile(file);
   return {
     service: { id: 'photo', name: 'Photo', color: '#ff3b7a' },
     handle: 'mystery_target',
@@ -191,7 +198,7 @@ function loadImage(src, timeout) {
   });
 }
 
-function initialsAvatar(handle, color) {
+export function initialsAvatar(handle, color) {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const g = c.getContext('2d');
