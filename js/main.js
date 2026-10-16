@@ -1,3 +1,4 @@
+import { inject } from '@vercel/analytics';
 import { loadProfile, profileFromFile, imageFromFile } from './profile.js';
 import { Game, replayDamage } from './game.js';
 import { makeShareImage, shareLink } from './share.js';
@@ -6,6 +7,8 @@ import { WEAPONS, WEAPON_ORDER } from './weapons.js';
 import { drawGun } from './gunman.js';
 import { PRESETS, presetProfile } from './targets.js';
 import { Clip } from './clip.js';
+
+inject();
 
 const $ = id => document.getElementById(id);
 const SCREENS = ['home', 'game', 'result'];
